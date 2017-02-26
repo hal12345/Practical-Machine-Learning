@@ -1,0 +1,155 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Hal12345"
+date: "25/2/2017"
+output: 
+  html_document: 
+    keep_md: yes
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Synopsys
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Citations
+Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6.
+
+Read more: http://groupware.les.inf.puc-rio.br/har#ixzz4ZiXJY7dM
+
+## The setting
+```{r setting echo:FALSE}
+
+library(ggplot2)
+library(lattice)
+library(caret)
+library(rpart)
+library(rattle)
+library(randomForest)
+
+```
+
+## The question
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. 
+
+
+## The data
+
+The training data for this project are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The dataset are supposed to have been dowloaded inside the working directory
+
+A quick look at the dataset shows that there are a lot of values that are missing (NULL, NA, #DIV/0!). They will all be considered as NA values
+
+```{r data}
+trads <- read.csv('pml-training.csv', na.strings=c('', '#DIV/0!', 'NA'), header=TRUE, sep=',')
+tstds <- read.csv('pml-testing.csv', na.strings=c('', '#DIV/0!', 'NA'), header=TRUE, sep=',')
+dim(trads)
+dim(tstds)
+```
+
+### Cleansing
+```{r cleansing}
+#clensing
+
+#get rid of all NA colums
+trads<-Filter(function(trads)!all(is.na(trads)), trads)
+tstds<-Filter(function(tstds)!all(is.na(tstds)), tstds)
+
+#get rid of usless predictors
+trads$X<-NULL
+trads$user_name	<- NULL
+trads$raw_timestamp_part_1 <- NULL	
+trads$raw_timestamp_part_2 <- NULL	
+trads$cvtd_timestamp <- NULL	
+trads$new_window <- NULL
+trads$num_window <- NULL
+
+#keep only common complet columns in both training and testing datasets
+commoncols<-intersect(colnames(trads),colnames((tstds)))
+classe<-trads$classe
+problem_id<-tstds$problem_id
+trads<-trads[,commoncols]
+tstds<-tstds[,commoncols]
+
+trads$classe<-classe
+tstds$problem_id<-problem_id
+
+#keep only complete cases for the training set
+trads<-trads[complete.cases(trads), ] 
+dim(trads)
+
+```
+
+##Prediction
+
+###Partitioning the data in training and testing sets
+
+```{r partition}
+intrads<-createDataPartition(y=trads$classe, p=0.60,list=FALSE)
+traintrads <- trads[intrads,]
+testtrads <- trads[-intrads,]
+set.seed(999)
+```
+
+###Predicting model with Trees
+
+```{r tree}
+model1 <- rpart(classe ~ ., data=traintrads, method="class")
+fancyRpartPlot(model1)
+
+predict1 <- predict(model1, testtrads, type = "class")  
+confusionMatrix(predict1, testtrads$classe) 
+
+
+```
+We notice that the accuracy is pretty poor 0.7075
+
+###Predicting model with Bagging
+```{r bagging}
+
+
+predictors <- traintrads
+predictors$classe <- NULL
+
+model2 <- bag(predictors, traintrads$classe, B = 10,
+                bagControl = bagControl(fit = ctreeBag$fit,
+                                        predict = ctreeBag$pred,
+                                        aggregate = ctreeBag$aggregate))
+
+predict2 <- predict(model2, testtrads, type = "class")  
+confusionMatrix(predict2, testtrads$classe) 
+
+```
+
+The accuracy 0.9565 is much better that the one computed by Tree
+
+###Predicting model with Random forest
+
+
+```{r forest}
+model3<-randomForest(formula = classe ~ ., data = traintrads, nPerm=5) 
+predict3 <- predict(model3, testtrads, type = "class")  
+confusionMatrix(predict3, testtrads$classe) 
+```
+
+With an accuracy of 0.994, Random forest is the winner
+
+###Prediction model with the given test dataset using Random forest
+```{r prediction}
+modelprediction<-predict(model3, newdata=tstds)
+```
+
+###Predicted classes with the selected model
+```{r quiz}
+modelprediction
+```
+
+
+
+
