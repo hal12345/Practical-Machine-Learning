@@ -14,4 +14,3 @@ The training data for this project are available here: https://d396qusza40orc.cl
 The test data are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
 
 The dataset are supposed to have been dowloaded inside the working directory where the code is going to be executed
-# Practical-Machine-Learning
